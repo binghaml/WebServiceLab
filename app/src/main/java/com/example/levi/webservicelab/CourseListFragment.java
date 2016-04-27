@@ -1,8 +1,11 @@
 package com.example.levi.webservicelab;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
@@ -12,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import com.example.levi.webservicelab.data.CourseDB;
 import com.example.levi.webservicelab.model.Course;
 
 import java.io.BufferedReader;
@@ -36,6 +40,8 @@ public class CourseListFragment extends Fragment {
 
     private OnListFragmentInteractionListener mListener;
     private RecyclerView mRecyclerView;
+    private List<Course> mCourseList;
+    private CourseDB mCourseDB;
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -58,16 +64,59 @@ public class CourseListFragment extends Fragment {
         // Set the adapter
         if (view instanceof RecyclerView) {
             Context context = view.getContext();
-            RecyclerView recyclerView = (RecyclerView) view;
+            mRecyclerView = (RecyclerView) view;
             if (mColumnCount <= 1) {
-                recyclerView.setLayoutManager(new LinearLayoutManager(context));
+                mRecyclerView.setLayoutManager(new LinearLayoutManager(context));
             } else {
-                recyclerView.setLayoutManager(new GridLayoutManager(context, mColumnCount));
+                mRecyclerView.setLayoutManager(new GridLayoutManager(context, mColumnCount));
             }
         }
 
         DownloadCoursesTask task = new DownloadCoursesTask();
         task.execute(new String[]{COURSE_URL});
+
+        FloatingActionButton floatingActionButton = (FloatingActionButton)
+                getActivity().findViewById(R.id.fab);
+        floatingActionButton.show();
+
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            DownloadCoursesTask task1 = new DownloadCoursesTask();
+            task1.execute(new String[]{COURSE_URL});
+        }     else {
+            Toast.makeText(view.getContext(),
+                    "No network connection available. Cannot display courses",
+                    Toast.LENGTH_SHORT) .show();
+
+            if (mCourseDB == null) {
+                mCourseDB = new CourseDB(getActivity());
+            }
+            if (mCourseList == null) {
+                mCourseList = mCourseDB.getCourses();
+            }
+            mRecyclerView.setAdapter(new MyCourseListRecyclerViewAdapter(mCourseList, mListener));
+        }
+
+        try {
+            InputStream inputStream = getActivity().openFileInput(
+                getString(R.string.LOGIN_FILE));
+            if ( inputStream != null ) {
+                InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+                String receiveString = "";
+                StringBuilder stringBuilder = new StringBuilder();
+                while ((receiveString = bufferedReader.readLine()) != null) {
+                    stringBuilder.append(receiveString);
+                }
+                inputStream.close();
+                Toast.makeText(getActivity(), stringBuilder.toString(), Toast.LENGTH_SHORT)
+                        .show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         return view;
     }
@@ -149,12 +198,26 @@ public class CourseListFragment extends Fragment {
             }
             // Everything is good, show the list of courses.
             if (!courseList.isEmpty()) {
-                //mRecyclerView = new RecyclerView(getContext());
                 mRecyclerView.setAdapter(new MyCourseListRecyclerViewAdapter(courseList, mListener));
+
+                if (mCourseDB == null) {
+                    mCourseDB = new CourseDB(getActivity());
+                }
+                // Delete old data so that you can refresh the local
+                // database with the network data.
+                mCourseDB.deleteCourses();
+
+                // Also, add to the local database
+                for (int i=0; i<courseList.size(); i++) {
+                    Course course = courseList.get(i);
+                    mCourseDB.insertCourse(course.getmCourseId(),
+                            course.getmShortDescription(),
+                            course.getmLongDescription(),
+                            course.getmPrereqs());
+                }
             }
         }
     }
-
 }
 
 
