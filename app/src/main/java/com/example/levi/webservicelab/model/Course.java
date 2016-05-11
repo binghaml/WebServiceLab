@@ -51,8 +51,14 @@ public class Course implements Serializable {
         return mCourseId;
     }
 
-    public void setmCourseId(String mCourseId) {
-        this.mCourseId = mCourseId;
+    public void setmCourseId(String mCourseId) throws IllegalArgumentException{
+        if(mCourseId == null){
+            throw new IllegalArgumentException("Course ID is null");
+        } else if(mCourseId.length() <= 5) {
+            throw new IllegalArgumentException("Course ID was too short");
+        } else {
+            this.mCourseId = mCourseId;
+        }
     }
 
     public String getmShortDescription() {
